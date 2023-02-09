@@ -10,7 +10,7 @@ import javax.swing.JFrame;
 public class GameFrame extends JFrame {
     public void init(GamePanel gamePanel) {
         setLayout(null);
-        setBounds(-800, 400, 600, 600);
+        setBounds(-800, -100, 600, 600);
         setResizable(false);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         addKeyListener(new KeyListen(gamePanel));

@@ -20,6 +20,13 @@ public class OutputNeuron extends AbstractNeuron {
      */
     public OutputNeuron(int preAllNum) {
         weight = new int[preAllNum];
+
+        if (INIT_MIN_WEIGHT != 0 && INIT_MAX_WEIGHT != 0) {
+            int bounds = INIT_MAX_WEIGHT - INIT_MIN_WEIGHT;
+            for (int i = 0; i < preAllNum; i++) {
+                weight[i] = GamePanel.getRandomInt(bounds) + INIT_MIN_WEIGHT;
+            }
+        }
     }
 
     public void clearCache() {
@@ -50,7 +57,7 @@ public class OutputNeuron extends AbstractNeuron {
         }
 
         int lastIndex = topNum - 1;
-        int startIndex = GamePanel.getRandomInt(weight.length - 10) + 10;
+        int startIndex = GamePanel.getRandomInt(weight.length - 2) + 1;
 
         iii(startIndex, weight.length - 1, winIndex, lastIndex);
         iii(0, startIndex - 1, winIndex, lastIndex);

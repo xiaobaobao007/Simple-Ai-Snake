@@ -1,5 +1,6 @@
 package snake;
 
+import constant.AllConstant;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.util.Arrays;
@@ -17,22 +18,16 @@ import nn.neuron.OutputNeuron;
  * @author: baomengyang <baomengyang@sina.cn>
  * @create: 2023-02-08 13:04
  */
-public class GamePanel extends JPanel {
+public class GamePanel extends JPanel implements AllConstant {
 
     private NetManager netManager;
 
     private final ScheduledExecutorService poll = Executors.newScheduledThreadPool(1);
 
-    public static final int MAP_WIDTH = 10;
-    public static final int MAP_HEIGHT = 10;
-
     private final int Panel_WIDTH = 500;
     private final int Panel_HEIGHT = 500;
 
-    private final int BLOCK_WIDTH = Panel_WIDTH / MAP_WIDTH;
-    private final int BLOCK_HEIGHT = Panel_HEIGHT / MAP_HEIGHT;
-
-    private int[] trainInputData = new int[MAP_WIDTH * MAP_HEIGHT + 3];
+    private final int[] trainInputData = new int[MAP_WIDTH * MAP_HEIGHT + 3];
 
     private Point food;
     private final LinkedList<Point> snake = new LinkedList<>();
@@ -41,9 +36,11 @@ public class GamePanel extends JPanel {
     private int nowDirection;
     private int switchDirection;
     private final int[][] directionArray = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
-    private final int[][] initSnake = {{2, 5}, {3, 5}};//从尾开始
 
     public static final Random random = new Random();
+
+    private boolean doAi = true;
+    private int moveTimes;
 
     public void init(NetManager netManager) {
         this.netManager = netManager;
@@ -51,10 +48,21 @@ public class GamePanel extends JPanel {
 
         resetAll(null);
 
-        for (int i = 0; i < 100; i++) {
-            train(netManager);
+        int last = 30;
+        int max = TRAIN_TIMES;
+        int out = max / last;
+
+        for (int i = 0; i < max; i++) {
+            calculate();
             move();
+            if (i % out == 0) {
+                System.out.printf("%d ", (last--));
+            }
         }
+        System.out.println();
+
+        netManager.sout();
+        doAi = false;
 
         poll.scheduleWithFixedDelay(() -> {
             try {
@@ -62,11 +70,10 @@ public class GamePanel extends JPanel {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }, 50, 50, TimeUnit.MILLISECONDS);
+        }, 300, 300, TimeUnit.MILLISECONDS);
     }
 
-
-    public void train(NetManager netManager) {
+    public void calculate() {
         Arrays.fill(trainInputData, 0);
 
         for (Point point : snake) {
@@ -86,17 +93,10 @@ public class GamePanel extends JPanel {
             outputData[nowDirection + 2].setCacheResult(Long.MIN_VALUE);
         }
 
-        int i;
-        for (i = 1; i < outputData.length; i++) {
-            if (outputData[i - 1].getResult() != outputData[i].getResult()) {
-                break;
-            }
-        }
-
         int maxIndex = 0;
         long maxResult = Long.MIN_VALUE;
 
-        for (i = 0; i < outputData.length; i++) {
+        for (int i = 0; i < outputData.length; i++) {
             if (outputData[i].getResult() > maxResult) {
                 maxIndex = i;
             } else if (outputData[i].getResult() == maxResult && random.nextBoolean()) {
@@ -112,21 +112,19 @@ public class GamePanel extends JPanel {
     }
 
     public void initSnake() {
-        nowDirection = switchDirection = 0;
+        moveTimes = 0;
+        nowDirection = switchDirection = random.nextInt(3);
 
         snake.clear();
-        for (int[] data : initSnake) {
-            snake.addFirst(new Point().init(data[0], data[1]));
-        }
+        int startX = random.nextInt(MAP_WIDTH - 2) + 1;
+        int startY = random.nextInt(MAP_HEIGHT - 2) + 1;
+        snake.addFirst(new Point().init(startX, startY));
 
         empty.clear();
         for (int h = 0; h < MAP_HEIGHT; h++) {
-            SEARCH:
             for (int w = 0; w < MAP_WIDTH; w++) {
-                for (int[] data : initSnake) {
-                    if (w == data[0] && h == data[1]) {
-                        continue SEARCH;
-                    }
+                if (w == startX && h == startY) {
+                    continue;
                 }
                 empty.add(new Point().init(w, h));
             }
@@ -143,7 +141,7 @@ public class GamePanel extends JPanel {
     }
 
     private void trick() {
-        train(netManager);
+        calculate();
         move();
         repaint();
     }
@@ -169,16 +167,31 @@ public class GamePanel extends JPanel {
             }
         }
 
+        if (moveTimes > 50) {
+            netManager.encourage(nowDirection, FeedbackScore.LOOP);
+        }
+
         if (newX == food.getX() && newY == food.getY()) {
+            moveTimes = 0;
             snake.addFirst(food);
             empty.remove(food);
 
             randomFood();
 
-            if (netManager != null) {
+            if (doAi && netManager != null) {
                 netManager.success(switchDirection);
             }
         } else {
+            if (doAi && netManager != null) {
+                int oldDistance = Math.abs(food.getX() - first.getX()) + Math.abs(food.getY() - first.getY());
+                int newDistance = Math.abs(food.getX() - newX) + Math.abs(food.getY() - newY);
+                if (newDistance < oldDistance) {
+                    netManager.encourage(nowDirection, FeedbackScore.MOVE, newDistance << 1);
+                } else if (newDistance > oldDistance) {
+                    netManager.encourage(nowDirection, FeedbackScore.MOVE, -newDistance >> 1);
+                }
+            }
+
             Point newPoint = snake.removeLast();
             empty.add(newPoint.cloneNew());
 
@@ -187,6 +200,8 @@ public class GamePanel extends JPanel {
 
             empty.remove(newPoint);
         }
+
+        moveTimes++;
     }
 
     public void right() {
@@ -219,6 +234,8 @@ public class GamePanel extends JPanel {
 
         boolean head = true;
         g.setColor(new Color(16, 92, 7));
+        int BLOCK_WIDTH = Panel_WIDTH / MAP_WIDTH;
+        int BLOCK_HEIGHT = Panel_HEIGHT / MAP_HEIGHT;
         for (Point point : snake) {
             g.fillRect(BLOCK_WIDTH * point.getX(), BLOCK_HEIGHT * point.getY(), BLOCK_WIDTH, BLOCK_HEIGHT);
             if (head) {

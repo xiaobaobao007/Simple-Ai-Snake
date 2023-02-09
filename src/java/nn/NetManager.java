@@ -1,5 +1,6 @@
 package nn;
 
+import constant.AllConstant;
 import nn.neuron.HideNeuron;
 import nn.neuron.InputNeuron;
 import nn.neuron.OutputNeuron;
@@ -9,34 +10,32 @@ import nn.neuron.OutputNeuron;
  * @author: baomengyang <baomengyang@sina.cn>
  * @create: 2023-02-08 10:57
  */
-public class NetManager {
+public class NetManager implements AllConstant {
 
     private final InputNeuron[] inputNeurons;
 
-    private final HideNeuron[] hideNeurons1;
-    private final HideNeuron[] hideNeurons2;
-
+    private final HideNeuron[][] hideNeuronTwo;
+    private final int hideLastIndex;
     private final OutputNeuron[] outputNeurons;
 
-    public NetManager(int inputNum, int hideNum, int outNum) {
-        outputNeurons = new OutputNeuron[outNum];
-        for (int i = 0; i < outNum; i++) {
-            outputNeurons[i] = new OutputNeuron(hideNum);
-        }
-
-        hideNeurons2 = new HideNeuron[hideNum];
-        for (int i = 0; i < hideNum; i++) {
-            hideNeurons2[i] = new HideNeuron(hideNum, 0.01);
-        }
-
-        hideNeurons1 = new HideNeuron[hideNum];
-        for (int i = 0; i < hideNum; i++) {
-            hideNeurons1[i] = new HideNeuron(inputNum, 1);
-        }
-
+    public NetManager(int inputNum, int hideLevel, int hideNum, int outNum) {
         inputNeurons = new InputNeuron[inputNum];
         for (int i = 0; i < inputNum; i++) {
             inputNeurons[i] = new InputNeuron();
+        }
+
+        hideNeuronTwo = new HideNeuron[hideLevel][];
+        for (int i = 0; i < hideLevel; i++) {
+            hideNeuronTwo[i] = new HideNeuron[hideNum];
+            for (int j = 0; j < hideNum; j++) {
+                hideNeuronTwo[i][j] = new HideNeuron(i == 0 ? inputNum : hideNum, 1 * Math.pow(0.1, i));
+            }
+        }
+        hideLastIndex = hideLevel - 1;
+
+        outputNeurons = new OutputNeuron[outNum];
+        for (int i = 0; i < outNum; i++) {
+            outputNeurons[i] = new OutputNeuron(hideNum);
         }
     }
 
@@ -59,62 +58,111 @@ public class NetManager {
     }
 
     public OutputNeuron[] calculate() {
-        for (HideNeuron hideNeuron : hideNeurons1) {
-            hideNeuron.clearCache();
-            for (int i = 0; i < inputNeurons.length; i++) {
-                hideNeuron.addCacheResult(i, inputNeurons[i].getNextValue());
-            }
-        }
+        for (int i = 0; i < hideNeuronTwo.length; i++) {
+            HideNeuron[] hideNeuronOne = hideNeuronTwo[i];
+            for (HideNeuron hideNeuron : hideNeuronOne) {
+                hideNeuron.clearCache();
 
-        for (HideNeuron hideNeuron : hideNeurons2) {
-            hideNeuron.clearCache();
-            for (int i = 0; i < hideNeurons1.length; i++) {
-                hideNeuron.addCacheResult(i, hideNeurons1[i].getNextValue());
+                if (i == 0) {
+                    for (int j = 0; j < inputNeurons.length; j++) {
+                        hideNeuron.addCacheResult(j, inputNeurons[j].getNextValue());
+                    }
+                } else {
+                    for (int j = 0; j < hideNeuronOne.length; j++) {
+                        hideNeuron.addCacheResult(j, hideNeuronTwo[i - 1][j].getNextValue());
+                    }
+                }
             }
         }
 
         for (OutputNeuron outputNeuron : outputNeurons) {
             outputNeuron.clearCache();
-            for (int i = 0; i < hideNeurons2.length; i++) {
-                outputNeuron.addCacheResult(i, hideNeurons2[i].getNextValue());
+            HideNeuron[] hideNeurons = hideNeuronTwo[hideLastIndex];
+            for (int i = 0; i < hideNeurons.length; i++) {
+                outputNeuron.addCacheResult(i, hideNeurons[i].getNextValue());
             }
         }
 
         return outputNeurons;
     }
 
-    private static final int WIN_ADD_SCORE = 5;
-    private static final int FAIL_ADD_SCORE = -1;
-
     public void success(int winIndex) {
-        for (int i = 0; i < outputNeurons.length; i++) {
-            OutputNeuron outputNeuron = outputNeurons[i];
-            if (i == winIndex) {
-                for (int hide2Index : outputNeuron.topWeightChange(15, WIN_ADD_SCORE)) { //40
-                    for (int hide1Index : hideNeurons2[hide2Index].topWeightChange(15, WIN_ADD_SCORE)) {
-                        hideNeurons1[hide1Index].topWeightChange(35, WIN_ADD_SCORE);
-                    }
-                }
-            }
-        }
+        encourage(winIndex, FeedbackScore.GET_FOOD);
     }
 
     public void fail(int failIndex) {
-        for (int hide2Index : outputNeurons[failIndex].topWeightChange(15, FAIL_ADD_SCORE)) {
-            for (int hide1Index : hideNeurons2[hide2Index].topWeightChange(15, FAIL_ADD_SCORE)) {
-                hideNeurons1[hide1Index].topWeightChange(35, FAIL_ADD_SCORE);
+        encourage(failIndex, FeedbackScore.FAIL);
+    }
+
+    public void encourage(int winIndex, FeedbackScore feedbackScore) {
+        encourage(winIndex, feedbackScore, feedbackScore.addScore);
+    }
+
+    public void encourage(int winIndex, FeedbackScore feedbackScore, int score) {
+        OutputNeuron outputNeuron = outputNeurons[winIndex];
+        for (
+                int hide2Index : outputNeuron.topWeightChange(feedbackScore.num1, score)) { //40
+            for (int i = hideNeuronTwo.length - 1; i > 0; i--) {
+                HideNeuron[] hideNeurons = hideNeuronTwo[i];
+                for (int hide1Index : hideNeurons[hide2Index].topWeightChange(feedbackScore.num2, score)) {
+                    hideNeurons[hide1Index].topWeightChange(i == 1 ? feedbackScore.num3 : feedbackScore.num2, score);
+                }
             }
+        }
+
+    }
+
+    public void sout() {
+        System.out.println("隐藏层参数");
+        for (int i = 0; i < hideNeuronTwo.length; i++) {
+            soutHideResult("第" + (i + 1) + "层", hideNeuronTwo[i]);
+        }
+
+        System.out.println("输出层参数");
+        for (int i = 0; i < outputNeurons.length; i++) {
+            soutOutWeight("第" + (i + 1) + "层", outputNeurons[i].getWeight());
         }
     }
 
-//    public void sout() {
-//        for (HideNeuron hideNeuron : hideNeurons) {
-//            System.out.println(Arrays.toString(hideNeuron.getWeight()));
-//        }
-//        System.out.println("---------------");
-//        for (OutputNeuron outputNeuron : outputNeurons) {
-//            System.out.println(Arrays.toString(outputNeuron.getWeight()));
-//        }
-//    }
+    public void soutHideResult(String name, OutputNeuron[] array) {
+        long min = Long.MAX_VALUE;
+        long max = Long.MIN_VALUE;
+        int less_Num = 0;
+        int more_Num = 0;
+
+        for (OutputNeuron data : array) {
+            long result = data.getResult();
+            min = Math.min(min, result);
+            max = Math.max(max, result);
+
+            if (result > 0) {
+                more_Num++;
+            } else if (result < 0) {
+                less_Num++;
+            }
+        }
+
+        System.out.printf("%-6s  最小值%10d 最大值%10d 负数量%3d 正数量%3d\n", name, min, max, less_Num, more_Num);
+    }
+
+    public void soutOutWeight(String name, int[] array) {
+        long min = Long.MAX_VALUE;
+        long max = Long.MIN_VALUE;
+        int less_Num = 0;
+        int more_Num = 0;
+
+        for (int result : array) {
+            min = Math.min(min, result);
+            max = Math.max(max, result);
+
+            if (result > 0) {
+                more_Num++;
+            } else if (result < 0) {
+                less_Num++;
+            }
+        }
+
+        System.out.printf("%-6s  最小值%10d 最大值%10d 负数量%3d 正数量%3d\n", name, min, max, less_Num, more_Num);
+    }
 
 }

@@ -9,7 +9,6 @@ import snake.GamePanel;
  * @create: 2023-02-08 10:18
  */
 public class SnakeMain {
-
     public static void main(String[] args) {
         NetManager netManager = new NetManager(
                 GamePanel.MAP_HEIGHT * GamePanel.MAP_WIDTH + 3

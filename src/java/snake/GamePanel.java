@@ -87,28 +87,35 @@ public class GamePanel extends JPanel implements AllConstant {
         netManager.inputData(trainInputData);
         OutputNeuron[] outputData = netManager.calculate();
 
+
         if (nowDirection - 2 >= 0) {
             outputData[nowDirection - 2].setCacheResult(Long.MIN_VALUE);
         } else {
             outputData[nowDirection + 2].setCacheResult(Long.MIN_VALUE);
         }
 
-        int maxIndex = 0;
-        long maxResult = Long.MIN_VALUE;
-
-        for (int i = 0; i < outputData.length; i++) {
-            if (outputData[i].getResult() > maxResult) {
-                maxIndex = i;
-            } else if (outputData[i].getResult() == maxResult && random.nextBoolean()) {
-                maxIndex = i;
-            } else {
-                continue;
+        boolean allSame = true;
+        for (int i = 1; i < outputData.length; i++) {
+            if (outputData[i].getResult() != outputData[i - 1].getResult()) {
+                allSame = false;
+                break;
             }
-
-            maxResult = outputData[i].getResult();
         }
 
-        switchDirection = maxIndex;
+        if (allSame) {
+            while (outputData[nowDirection = random.nextInt(outputData.length)].getResult() == Long.MIN_VALUE) {
+            }
+        } else {
+            switchDirection = 0;
+            long maxResult = Long.MIN_VALUE;
+
+            for (int i = 0; i < outputData.length; i++) {
+                if (outputData[i].getResult() > maxResult) {
+                    switchDirection = i;
+                    maxResult = outputData[i].getResult();
+                }
+            }
+        }
     }
 
     public void initSnake() {

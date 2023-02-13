@@ -11,19 +11,23 @@ public interface AllConstant {
      */
     int TRAIN_TIMES = 1000000;
 
-    int INIT_MIN_WEIGHT = -2;
-    int INIT_MAX_WEIGHT = 2;
+    int INIT_MIN_WEIGHT = 0;
+    int INIT_MAX_WEIGHT = 0;
 
     //隐藏层 层数
-    int HIDE_LEVEL = 2;
+    int HIDE_LEVEL = 1;
     //隐藏层 神经元个数
-    int HIDE_NUM = 10;
+    int HIDE_NUM = 4;
 
     enum FeedbackScore {
         GET_FOOD(3, 3, 8, 10),//吃到食物
         FAIL(2, 4, 8, -2),//失败
         LOOP(2, 4, 8, -2),//死循环
         MOVE(4, 4, 8),//移动
+
+        GUESS_SUCCESS(2, 0, 2, 1),
+        GUESS_FAIL(2, 0, 2, -100),
+
         ;
 
         //激励输出层相连的隐藏层单层的个数

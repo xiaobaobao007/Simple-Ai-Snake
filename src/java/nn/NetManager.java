@@ -100,16 +100,20 @@ public class NetManager implements AllConstant {
 
     public void encourage(int winIndex, FeedbackScore feedbackScore, int score) {
         OutputNeuron outputNeuron = outputNeurons[winIndex];
-        for (
-                int hide2Index : outputNeuron.topWeightChange(feedbackScore.num1, score)) { //40
-            for (int i = hideNeuronTwo.length - 1; i > 0; i--) {
-                HideNeuron[] hideNeurons = hideNeuronTwo[i];
-                for (int hide1Index : hideNeurons[hide2Index].topWeightChange(feedbackScore.num2, score)) {
-                    hideNeurons[hide1Index].topWeightChange(i == 1 ? feedbackScore.num3 : feedbackScore.num2, score);
-                }
+        int hideLevel = hideNeuronTwo.length - 1;
+        for (int hideToIndex : outputNeuron.topWeightChange(feedbackScore.num1, score)) {
+            encourageHideToHide(hideLevel, hideToIndex, feedbackScore, score);
+        }
+    }
+
+    public void encourageHideToHide(int hideLevel, int hideIndex, FeedbackScore feedbackScore, int score) {
+        int toHideLevel = hideLevel - 1;
+        int[] data = hideNeuronTwo[hideLevel][hideIndex].topWeightChange(hideLevel == 0 || toHideLevel == 0 ? feedbackScore.num3 : feedbackScore.num2, score);
+        if (toHideLevel >= 0) {
+            for (int hideToIndex : data) {
+                encourageHideToHide(toHideLevel, hideToIndex, feedbackScore, score);
             }
         }
-
     }
 
     public void sout() {
